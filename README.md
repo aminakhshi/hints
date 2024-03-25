@@ -85,10 +85,12 @@ If you use `HiNTS` in your research, please cite our work as follows:
   publisher={#}
 }
 
+
+
 @article{revealing2024,
-  title={Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
-  author={Tabar et al.},
-  journal={Phys. Rev. X},
+  title = {Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
+  author = {Tabar, M. Reza Rahimi and Nikakhtar, Farnik and Parkavousi, Laya and Akhshi, Amin and Feudel, Ulrike and Lehnertz, Klaus},
+  journal = {Phys. Rev. X},
   volume = {14},
   issue = {1},
   pages = {011050},
