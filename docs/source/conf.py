@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.abspath('../../examples'))
 # from hints import __version__
 
 # Get the version and release
-version = 0.1.1
-release = 0.1
+version = '0.1.1'
+release = '0.1'
 project = 'HiNTS'
 copyright = '2024, Amin Akhshi'
 author = 'Amin Akhshi'
