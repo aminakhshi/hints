@@ -100,13 +100,18 @@ If you use `HiNTS` in your research, please cite our work as follows:
   url = {https://link.aps.org/doi/10.1103/PhysRevX.14.011050}
 }
 
-@article{reconstruction2023,
-  title={Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
-  author={Nikakhtar et al.},
-  journal={New Journal of Physics},
-  year={2023},
-  publisher={IOP Publishing}
+
+@Article{reconstruction2023,
+  author  = {Nikakhtar, Farnik and Parkavousi, Laya and Sahimi, Muhammad and Tabar, M Reza Rahimi and Feudel, Ulrike and Lehnertz, Klaus},
+  journal = {New J. Phys.},
+  title   = {Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
+  year    = {2023},
+  number  = {8},
+  pages   = {083025},
+  volume  = {25},
+  doi     = {10.1088/1367-2630/acec63},
 }
+
 ```
 
 ## Contact
