@@ -7,11 +7,11 @@ import sys
 sys.path.insert(0, os.path.abspath('../../hints'))
 sys.path.insert(0, os.path.abspath('../../examples'))
 # -- Project information -----------------------------------------------------
-from hints import __version__
+# from hints import __version__
 
 # Get the version and release
-version = __version__
-release = __version__
+version = 0.1.1
+release = 0.1
 project = 'HiNTS'
 copyright = '2024, Amin Akhshi'
 author = 'Amin Akhshi'
