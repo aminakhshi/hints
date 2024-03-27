@@ -1,0 +1,33 @@
+name: Sync README Files
+
+on: 
+  push:
+    paths:
+      - 'README.md'
+      - 'README.rst'
+
+jobs:
+  convert-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      - name: Setup Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+      
+      - name: Convert README.md to README.rst
+        run: |
+          pandoc --from=markdown --to=rst --output=README.rst README.md
+          
+      - name: Commit and Push
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add README.rst
+          git commit -m "Automatically sync README.rst with README.md" || exit 0
+          git push --set-upstream origin HEAD
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
