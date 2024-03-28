@@ -104,7 +104,9 @@ Authors
 Version History
 ---------------
 
--  0.1
+For a detailed list of changes for each version of the project, see the `Changelog <./CHANGELOG.md>`__. Currently, the project is in the beta stage and there might be some bugs and issues. We are working on improving the package and adding more features.
+
+-  0.1.x(2024-04-01)
 
    -  Initial beta release
 
@@ -126,20 +128,32 @@ If you use ``HiNTS`` in your research, please cite our work as follows:
    }
 
    @article{revealing2024,
-     title={Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
-     author={Tabar et al.},
-     journal={Phys. Rev. X},
-     year={2024},
-     publisher={American Physical Society}
+    title = {Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
+    author = {Tabar, M. Reza Rahimi and Nikakhtar, Farnik and Parkavousi, Laya and Akhshi, Amin and Feudel, Ulrike and Lehnertz, Klaus},
+    journal = {Phys. Rev. X},
+    volume = {14},
+    issue = {1},
+    pages = {011050},
+    numpages = {36},
+    year = {2024},
+    month = {Mar},
+    publisher = {American Physical Society},
+    doi = {10.1103/PhysRevX.14.011050},
+    url = {https://link.aps.org/doi/10.1103/PhysRevX.14.011050}
    }
 
    @article{reconstruction2023,
-     title={Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
-     author={Nikakhtar et al.},
-     journal={New Journal of Physics},
-     year={2023},
-     publisher={IOP Publishing}
+    title = {Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
+    author = {Nikakhtar, Farnik and Parkavousi, Laya and Sahimi, Muhammad and Tabar, M Reza Rahimi and Feudel, Ulrike and Lehnertz, Klaus},
+    journal = {New Journal of Physics},
+    volume = {25},
+    number = {8},
+    pages = {083025},
+    year = {2023},
+    publisher = {IOP Publishing},
+    doi = {10.1088/1367-2630/acec63},
    }
+
 
 Contact
 -------

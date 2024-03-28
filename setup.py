@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import re
 
 def get_version():
-    default_ver = '0.1.1'
+    default_ver = '0.1.2'
     try:
         with open('hints/__init__.py', 'r') as f:
             version_ = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", f.read(), re.M)
@@ -25,7 +25,7 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/aminakhshi/hints',
-    packages = find_packages(),
+    packages = find_packages(exclude=["misc*", "result*", "data*"]),
     install_requires=get_requirements(),
     classifiers=[
         'Development Status :: 3 - Alpha',

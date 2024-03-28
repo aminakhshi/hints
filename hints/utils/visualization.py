@@ -276,7 +276,7 @@ class Plotter:
             ax7.axhline(y=1, color='black', linestyle='--')
         
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_figure.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_figure.pdf'))
             plt.close()
         pass
 
@@ -408,7 +408,7 @@ class Plotter:
         mark_inset(ax7, axins, loc1=3, loc2=2, fc="none", ec="0.5")
         
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_figure.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_figure.pdf'))
             plt.close()
         pass
 
@@ -534,7 +534,7 @@ class Plotter:
         mark_inset(ax7, axins, loc1=3, loc2=2, fc="none", ec="0.5")
         
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_figure.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_figure.pdf'))
             plt.close()
         pass
 
@@ -674,7 +674,7 @@ class Plotter:
         mark_inset(ax7, axins, loc1=3, loc2=2, fc="none", ec="0.5")
 
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_figure.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_figure.pdf'))
             plt.close()
         pass
 
@@ -735,7 +735,7 @@ class Plotter:
             ax.legend(handles=[true_line, estimated_line], loc='upper left')
             ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=3))
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_timeseries.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_timeseries.pdf'))
             plt.close()
         
         self.figure_size = kwargs.get('figure_size', (17.5*cm,6*cm))
@@ -768,7 +768,7 @@ class Plotter:
         axs[0].set_ylabel(r'$\Delta$')
         axs[4].set_ylabel(r'$\Delta$')
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_drifts.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_drifts.pdf'))
             plt.close()
         
         self.figure_size = kwargs.get('figure_size', (17.5*cm,8*cm))
@@ -803,7 +803,7 @@ class Plotter:
         axs[6].set_ylabel(r'$\Delta$')
 
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_diffusion.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_diffusion.pdf'))
             plt.close()
         
         self.figure_size = kwargs.get('figure_size', (17.5*cm,6*cm))
@@ -839,7 +839,7 @@ class Plotter:
         axs[6].set_ylabel(r'$R^{2}-score$')
 
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_rsquared.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_rsquared.pdf'))
             plt.close()
 
 def plot_ks_stats(results, **kwargs):
@@ -883,5 +883,5 @@ def plot_ks_stats(results, **kwargs):
             ax.set_ylabel(r'p-values')
         
         if save_plot:
-            plt.savefig(os.path.join(os.getcwd(), 'results', model_name, f'{model_name}_ks_stats.pdf'))
+            plt.savefig(os.path.join(os.getcwd(), 'result', model_name, f'{model_name}_ks_stats.pdf'))
             plt.close()

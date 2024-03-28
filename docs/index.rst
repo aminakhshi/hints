@@ -5,13 +5,15 @@
 
 Welcome to HiNTS's documentation!
 =================================
+.. include:: ../README.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-   readme
-
-
+   
+   usage
+   examples
+   
 Indices and tables
 ==================
 

@@ -231,7 +231,7 @@ class kmcc:
 
         if self.mode == 'diffusion':
             diffusion_indices = list(combinations_with_replacement(range(self.dimensions), 2))
-            product_diff = np.array([np.prod(segment_diff[:, idx], axis=1) for idx in diffusion_indices]).T
+            product_diff = np.array([np.prod(segment_diff[:, idx,], axis=1) for idx in diffusion_indices]).T
             return ts_matrix.T @ product_diff
 
     def _construct_keys(self):
@@ -263,7 +263,7 @@ class kmcc:
         """
 
         M_matrix = np.zeros((len(self.index_combinations), len(self.index_combinations)))
-        Y_matrix_dim = len(combinations_with_replacement(range(self.dimensions), 2)
+        Y_matrix_dim = len(list(combinations_with_replacement(range(self.dimensions), 2))
                            ) if self.mode == 'diffusion' else self.dimensions
         Y_matrix = np.zeros((len(self.index_combinations), Y_matrix_dim))
 
@@ -282,5 +282,8 @@ class kmcc:
         M_matrix /= self.n_samples
         Y_matrix /= self.n_samples
         coefficients = np.linalg.solve(M_matrix, Y_matrix) / self.dt
-        return pd.DataFrame(coefficients, index=self._construct_keys())
+        coefficients = pd.DataFrame(coefficients, index=self._construct_keys())
+        if self.mode == 'diffusion':
+            coefficients.columns = np.array([''.join([str(comb[0]), str(comb[1])]) for comb in list(combinations_with_replacement(range(self.dimensions), 2))])
+        return coefficients
 
