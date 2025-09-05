@@ -27,6 +27,11 @@ setup(
     url='https://github.com/aminakhshi/hints',
     packages = find_packages(exclude=["misc*", "result*", "data*"]),
     install_requires=get_requirements(),
+    extras_require={
+        'pytorch': ['torch'],
+        'hpc': ['torch'],
+        'gpu': ['torch']
+    },
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

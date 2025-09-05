@@ -7,4 +7,3 @@ sympy
 matplotlib
 seaborn
 scikit-image
-torch; extra == "pytorch"
