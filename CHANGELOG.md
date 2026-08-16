@@ -8,6 +8,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `get_noise_amplitude()` and `get_diffusion_matrix()` reconstruct the noise
+  amplitude matrix `G(x)` of the Langevin equation from the estimated diffusion
+  coefficients, so that `G G^T = D^(2)(x)`. Both the lower triangular
+  factorization used in the papers and the symmetric square root are available,
+  at the observed samples or at arbitrary states. Addresses the question raised
+  in issue [#3](https://github.com/aminakhshi/hints/issues/3).
 - Optional PyTorch backend (`backend='torch'`, `device=...`, `dtype=...`) for
   accumulating the moments of large datasets on a GPU. It is an optional extra:
   the package runs on NumPy by default and falls back to it, with a warning, if
@@ -56,7 +62,7 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Note on results
 
 This release does not change the numerical convention of the estimator or its
-behaviour at finite sampling interval. Diffusion coefficients continue to follow
+behavior at finite sampling interval. Diffusion coefficients continue to follow
 `D^(2)_ij = <dx_i dx_j> / dt`, without a factor of one half. Coefficient values
 are unchanged; only their column labels differ.
 

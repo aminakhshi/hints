@@ -1,33 +1,77 @@
 name: Sync README Files
 
-on: 
+# README.rst is generated from README.md so that PyPI and Read the Docs render
+# the same text. The conversion opens a pull request rather than pushing to
+# main, so that it works with a protected default branch.
+on:
   push:
+    branches:
+      - main
     paths:
+      # Only the source file triggers a sync. Watching the generated file as
+      # well would make the workflow respond to its own output.
       - 'README.md'
-      - 'README.rst'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-readme
+  cancel-in-progress: true
 
 jobs:
-  convert-and-commit:
+  sync-readme:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-      
-      - name: Setup Pandoc
+        uses: actions/checkout@v4
+
+      - name: Install pandoc
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
-      
+
       - name: Convert README.md to README.rst
-        run: |
-          pandoc --from=markdown --to=rst --output=README.rst README.md
-          
-      - name: Commit and Push
-        run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git add README.rst
-          git commit -m "Automatically sync README.rst with README.md" || exit 0
-          git push --set-upstream origin HEAD
+        run: pandoc --from=markdown --to=rst --output=README.rst README.md
+
+      - name: Open a pull request if the conversion changed anything
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- README.rst; then
+            echo "README.rst is already in sync with README.md; nothing to do."
+            exit 0
+          fi
+
+          branch="chore/sync-readme-${GITHUB_SHA::7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add README.rst
+          git commit -m "Sync README.rst with README.md"
+          git push --force-with-lease origin "$branch"
+
+          # A pull request may already exist if this commit was retried.
+          existing="$(gh pr list --head "$branch" --state open --json number --jq '.[].number')"
+          if [ -n "$existing" ]; then
+            echo "Pull request #$existing for $branch is already open and now has the latest conversion."
+            exit 0
+          fi
+
+          printf '%s\n' \
+            '`README.rst` is generated from `README.md` by the sync-readme workflow.' \
+            '' \
+            "Regenerated from ${GITHUB_SHA}." \
+            '' \
+            'Merging keeps the reStructuredText copy used by PyPI and Read the Docs in step with the Markdown source.' \
+            > pr-body.md
+
+          gh pr create \
+            --base "${GITHUB_REF_NAME}" \
+            --head "$branch" \
+            --title "Sync README.rst with README.md" \
+            --body-file pr-body.md
