@@ -2,8 +2,8 @@ tqdm
 ipykernel
 numpy
 pandas
+scipy
 jitcsde
 sympy
 matplotlib
 seaborn
-scikit-image

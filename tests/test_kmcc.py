@@ -1,0 +1,235 @@
+"""
+Regression tests for the Kramers-Moyal coefficient calculator.
+
+The tests estimate coefficients for linear stochastic differential equations
+whose drift and diffusion are known analytically, and check the bookkeeping
+that surrounds the estimator (input handling, segmentation, labelling).
+
+Run with ``pytest`` or directly with ``python tests/test_kmcc.py``.
+"""
+
+import os
+import pickle
+import sys
+import tempfile
+
+import numpy as np
+import pandas as pd
+import pytest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from hints.hints import kmcc
+
+DT = 0.01
+DRIFT_MATRIX = np.array([[-1.0, 0.5], [-0.5, -2.0]])
+NOISE_AMPLITUDE = np.array([0.5, 0.8])
+
+# Standard error of a drift coefficient is sqrt(D_ii / (T * Sigma_jj)), which is
+# about 0.02 for the trajectory length below. Tolerances are set at roughly four
+# standard errors so the tests are sensitive to real regressions without being
+# flaky, and the seeds are fixed so the outcome is deterministic.
+DRIFT_TOLERANCE = 0.08
+DIFFUSION_TOLERANCE = 0.02
+
+
+def simulate_ornstein_uhlenbeck(n_samples=1200000, seed=0):
+    """Euler-Maruyama realisation of dx = A x dt + sigma dW."""
+    rng = np.random.default_rng(seed)
+    increments = rng.standard_normal((n_samples, 2)) * (NOISE_AMPLITUDE * np.sqrt(DT))
+    series = np.zeros((n_samples, 2))
+    state = np.zeros(2)
+    for index in range(n_samples):
+        state = state + state @ DRIFT_MATRIX.T * DT + increments[index]
+        series[index] = state
+    return series
+
+
+@pytest.fixture(scope='module')
+def ou_series():
+    return simulate_ornstein_uhlenbeck()
+
+
+def test_drift_recovers_known_matrix(ou_series):
+    """The linear drift coefficients must reproduce A^T within sampling error."""
+    coefficients = kmcc(ts_array=ou_series, dt=DT, interaction_order=[1],
+                        estimation_mode='drift').get_coefficients()
+
+    assert list(coefficients.index) == ['x1', 'x2']
+    assert list(coefficients.columns) == ['F_x1', 'F_x2']
+    assert np.allclose(coefficients.to_numpy(), DRIFT_MATRIX.T, atol=DRIFT_TOLERANCE)
+
+
+def test_diffusion_recovers_known_amplitudes(ou_series):
+    """Diffusion follows the <dx_i dx_j>/dt convention, i.e. (G G^T)_ij.
+
+    The estimate carries a small positive bias because the second moment of the
+    increments also contains the squared drift, which contributes at order dt.
+    The tolerance accommodates that known bias at this sampling interval.
+    """
+    coefficients = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                        estimation_mode='diffusion').get_coefficients()
+
+    assert list(coefficients.columns) == ['D_x1x1', 'D_x1x2', 'D_x2x2']
+    estimated = coefficients.to_numpy().ravel()
+    expected = np.array([NOISE_AMPLITUDE[0] ** 2, 0.0, NOISE_AMPLITUDE[1] ** 2])
+    assert np.allclose(estimated, expected, atol=DIFFUSION_TOLERANCE)
+
+
+def test_segmentation_does_not_change_results(ou_series):
+    """Window size only bounds memory use, so coefficients must be invariant.
+
+    This also covers the case where the sample count is an exact multiple of
+    the window size, which previously double counted the trailing segment.
+    """
+    reference = kmcc(ts_array=ou_series, dt=DT, interaction_order=[1],
+                     window_exp_order=6).get_coefficients()
+
+    for window_exp_order in (2, 3, 4):
+        chunked = kmcc(ts_array=ou_series, dt=DT, interaction_order=[1],
+                       window_exp_order=window_exp_order).get_coefficients()
+        assert np.allclose(chunked.to_numpy(), reference.to_numpy(), atol=1e-10)
+
+
+def test_exact_multiple_of_window_size():
+    """A sample count that divides evenly by the window size must not be reused."""
+    rng = np.random.default_rng(1)
+    # 999 windows of 99 samples, plus one row consumed by np.diff.
+    series = rng.standard_normal((99 * 999 + 1, 2))
+
+    calculator = kmcc(ts_array=series, dt=DT, interaction_order=[1], window_exp_order=2)
+    values, values_remainder, diffs, diffs_remainder = calculator._segment_data()
+
+    assert values.shape == (999, 99, 2)
+    assert values_remainder.shape == (0, 2)
+    assert diffs.shape == (999, 99, 2)
+    assert diffs_remainder.shape == (0, 2)
+
+
+def test_constant_term_included_for_nonzero_mean():
+    """Order 0 estimates the constant drift alpha of dx = alpha dt + sigma dW."""
+    rng = np.random.default_rng(2)
+    alpha = np.array([1.5, -0.75])
+    steps = alpha * DT + rng.standard_normal((200000, 2)) * (0.3 * np.sqrt(DT))
+    series = np.cumsum(steps, axis=0)
+
+    coefficients = kmcc(ts_array=series, dt=DT, interaction_order=[0]).get_coefficients()
+
+    assert list(coefficients.index) == ['1']
+    assert np.allclose(coefficients.to_numpy().ravel(), alpha, atol=0.05)
+
+
+def test_index_combinations_cover_requested_orders():
+    """Term bookkeeping must match the requested interaction orders."""
+    series = np.random.default_rng(3).standard_normal((1000, 3))
+
+    keys = kmcc(ts_array=series, dt=DT, interaction_order=[0, 1])._construct_keys()
+    assert keys == ['1', 'x1', 'x2', 'x3']
+
+    keys = kmcc(ts_array=series, dt=DT, interaction_order=[2])._construct_keys()
+    assert keys == ['x1x1', 'x1x2', 'x1x3', 'x2x2', 'x2x3', 'x3x3']
+
+    # A two-element tuple is interpreted as an inclusive range of orders.
+    keys = kmcc(ts_array=series, dt=DT, interaction_order=(0, 1))._construct_keys()
+    assert keys == ['1', 'x1', 'x2', 'x3']
+
+
+@pytest.mark.parametrize('extension', ['.csv', '.npy', '.pkl'])
+def test_file_loading_round_trip(extension):
+    """Loading from disk must yield the same array as passing it directly."""
+    series = np.random.default_rng(4).standard_normal((500, 2))
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = os.path.join(directory, f'series{extension}')
+        if extension == '.csv':
+            pd.DataFrame(series, columns=['a', 'b']).to_csv(path, index=False)
+        elif extension == '.npy':
+            np.save(path, series)
+        else:
+            with open(path, 'wb') as handle:
+                pickle.dump(series, handle)
+
+        loaded = kmcc(path, dt=DT, interaction_order=[1]).time_series
+
+    assert loaded.shape == series.shape
+    assert np.allclose(loaded, series)
+
+
+def test_dataframe_input_matches_array_input():
+    """A DataFrame and its underlying array must produce identical results."""
+    series = np.random.default_rng(5).standard_normal((2000, 2))
+    frame = pd.DataFrame(series, columns=['first', 'second'])
+
+    from_array = kmcc(ts_array=series, dt=DT, interaction_order=[1]).get_coefficients()
+    from_frame = kmcc(ts_array=frame, dt=DT, interaction_order=[1]).get_coefficients()
+
+    assert np.allclose(from_array.to_numpy(), from_frame.to_numpy())
+
+
+def test_missing_input_raises():
+    with pytest.raises(ValueError, match='No input data'):
+        kmcc(dt=DT)
+
+
+def test_missing_file_raises():
+    with pytest.raises(FileNotFoundError):
+        kmcc('this_file_does_not_exist.csv', dt=DT)
+
+
+def test_unsupported_extension_raises():
+    with tempfile.TemporaryDirectory() as directory:
+        path = os.path.join(directory, 'series.xyz')
+        with open(path, 'w') as handle:
+            handle.write('0 0\n')
+        with pytest.raises(ValueError, match='Unsupported file format'):
+            kmcc(path, dt=DT)
+
+
+@pytest.mark.parametrize('kwargs, message', [
+    ({'dt': 0}, 'dt must be a positive number'),
+    ({'dt': -1.0}, 'dt must be a positive number'),
+    ({'estimation_mode': 'jump'}, 'is not valid'),
+    ({'solver': 'newton'}, 'is not valid'),
+    ({'interaction_order': [-1]}, 'Negative order'),
+    ({'window_exp_order': 0}, 'window_exp_order must be a positive integer'),
+])
+def test_invalid_parameters_raise(kwargs, message):
+    series = np.random.default_rng(6).standard_normal((100, 2))
+    parameters = {'dt': DT, **kwargs}
+    with pytest.raises(ValueError, match=message):
+        kmcc(ts_array=series, **parameters)
+
+
+def test_non_finite_values_raise():
+    series = np.random.default_rng(7).standard_normal((100, 2))
+    series[10, 1] = np.nan
+    with pytest.raises(ValueError, match='NaN or infinite'):
+        kmcc(ts_array=series, dt=DT)
+
+
+def test_transposed_input_warns():
+    series = np.random.default_rng(8).standard_normal((3, 500))
+    with pytest.warns(UserWarning, match='consider transposing'):
+        kmcc(ts_array=series, dt=DT, interaction_order=[1])
+
+
+def test_solvers_agree_on_well_conditioned_system(ou_series):
+    """All solvers must coincide when the moment matrix is well conditioned."""
+    results = [
+        kmcc(ts_array=ou_series, dt=DT, interaction_order=[1],
+             solver=solver).get_coefficients().to_numpy()
+        for solver in kmcc.SOLVERS
+    ]
+    for candidate in results[1:]:
+        assert np.allclose(candidate, results[0], atol=1e-8)
+
+
+def test_rank_deficient_expansion_warns():
+    """More expansion terms than samples must be reported, not silently solved."""
+    series = np.random.default_rng(9).standard_normal((12, 4))
+    with pytest.warns(UserWarning, match='rank deficient'):
+        kmcc(ts_array=series, dt=DT, interaction_order=[0, 1, 2, 3])
+
+
+if __name__ == '__main__':
+    raise SystemExit(pytest.main([__file__, '-v']))

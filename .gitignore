@@ -161,3 +161,8 @@ cython_debug/
 misc/
 data/
 result/
+
+# Large example datasets and cached analysis outputs (not distributed)
+examples/Synchronised measurements/
+examples/res/
+examples/Power Grid.ipynb
