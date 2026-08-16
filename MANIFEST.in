@@ -1,4 +1,13 @@
+# setup.py reads these at build time, so they must be inside the source
+# distribution or building a wheel from the sdist fails.
+include README.md
+include README.rst
+include requirements.txt
+include CHANGELOG.md
+include LICENSE
+
 recursive-exclude data *
 recursive-exclude result *
 recursive-exclude misc *
+recursive-exclude examples *
 exclude version_history.py
