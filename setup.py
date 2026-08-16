@@ -25,8 +25,13 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/aminakhshi/hints',
-    packages = find_packages(exclude=["misc*", "result*", "data*"]),
+    packages = find_packages(exclude=["misc*", "result*", "data*", "tests*"]),
     install_requires=get_requirements(),
+    extras_require={
+        # Optional GPU/HPC backend. The estimator runs on numpy by default.
+        'torch': ['torch>=1.10'],
+        'dev': ['pytest>=7.0'],
+    },
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

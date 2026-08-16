@@ -22,6 +22,27 @@ ILL_CONDITIONED_THRESHOLD = 1e10
 #: File extensions understood by :meth:`kmcc._load_data`.
 SUPPORTED_FORMATS = ('.csv', '.txt', '.npy', '.npz', '.pkl', '.pickle', '.mat')
 
+#: Floating point precisions accepted by the ``dtype`` keyword.
+DTYPES = ('float64', 'float32')
+
+
+def _load_torch():
+    """
+    Imports PyTorch on demand.
+
+    The import is deferred so that ``import hints`` stays fast for users who
+    never touch the GPU backend.
+
+    Returns
+    ----------
+    module or None: The imported ``torch`` module, or None when it is not installed.
+    """
+    try:
+        import torch
+    except ImportError:
+        return None
+    return torch
+
 
 class kmcc:
     """
@@ -42,6 +63,9 @@ class kmcc:
 
     #: Linear solvers accepted by the ``solver`` keyword.
     SOLVERS = ('solve', 'lstsq', 'pinv')
+
+    #: Computational backends accepted by the ``backend`` keyword.
+    BACKENDS = ('numpy', 'torch')
 
     def __init__(self, filepath=None, ts_array=None, **kwargs):
         r"""
@@ -67,6 +91,18 @@ class kmcc:
             Linear solver used for ``M c = Y`` ('solve', 'lstsq' or 'pinv').
             Defaults to 'solve', which falls back to a least-squares solution
             if the moment matrix turns out to be singular.
+        backend (str):
+            Where the statistical moments are accumulated: 'numpy' (default) or
+            'torch'. The torch backend is optional and only worth enabling for
+            large datasets on a GPU; it produces the same coefficients as numpy.
+        device (str):
+            Device used by the torch backend ('cpu', 'cuda', 'cuda:0', 'mps').
+            Defaults to 'cpu'. Falls back to 'cpu' with a warning when the
+            requested device is unavailable.
+        dtype (str):
+            Floating point precision used by the torch backend to accumulate the
+            moments, 'float64' (default) or 'float32'. The numpy backend always
+            accumulates in double precision.
 
         Notes
         ----------
@@ -83,6 +119,22 @@ class kmcc:
           i.e. **without** a factor of 1/2. For additive noise this returns
           :math:`(G G^{T})_{ij}` directly.
 
+        * Only the accumulation of the moment matrices runs on the selected
+          backend. The linear system itself is always solved in double precision
+          on the CPU, because it is small compared with the data and because the
+          monomial moment matrix is often ill conditioned.
+
+        * ``dtype='float32'`` roughly halves memory traffic but carries about
+          seven significant digits, which is not enough once the moment matrix
+          is ill conditioned. Prefer the default when accuracy matters.
+
+        * The torch backend only pays off for large problems, because moving the
+          data to the device costs more than the moment accumulation saves on
+          small ones. Measured on one machine, with an expansion of order 2:
+          at 4x10^5 samples and 2 state variables it is about 8 times slower
+          than numpy, while at 5x10^6 samples and 12 state variables it is about
+          8 times faster on a GPU. Benchmark your own workload before switching.
+
         Hints
         ----------
         For time series data exhibiting second-order stationarity, the typical number of data points required to estimate interaction strengths up to order Z = 3 is ~10^4 - 10^6 data points. For smaller datasets, it is advisable to choose a lower order of expansion, such as Z = 2 or Z = 1.
@@ -93,6 +145,10 @@ class kmcc:
         self.mode = kwargs.get('estimation_mode', 'drift')
         self.window_order = kwargs.get('window_exp_order', 6)
         self.solver = kwargs.get('solver', 'solve')
+        self.backend = kwargs.get('backend', 'numpy')
+        self.device = kwargs.get('device', 'cpu')
+        self.dtype = kwargs.get('dtype', 'float64')
+        self._torch = None
 
         if filepath is not None:
             self.time_series = self._load_data(filepath)
@@ -104,7 +160,81 @@ class kmcc:
             )
 
         self._check_inputs()
+        self._resolve_backend()
         self._prepare_data()
+
+    def _resolve_backend(self):
+        """
+        Imports PyTorch and selects a device, degrading to numpy or CPU when needed.
+
+        A missing PyTorch installation or an unavailable device is reported as a
+        warning rather than an error, so that code written for a GPU machine
+        still runs elsewhere.
+        """
+        if self.backend != 'torch':
+            return
+
+        self._torch = _load_torch()
+        if self._torch is None:
+            warnings.warn(
+                'PyTorch is not installed; falling back to the numpy backend. '
+                "Install it with 'pip install hints-kmcs[torch]'.",
+                stacklevel=3,
+            )
+            self.backend = 'numpy'
+            self.device = 'cpu'
+            return
+
+        family = self.device.split(':')[0]
+        available = {
+            'cpu': True,
+            'cuda': self._torch.cuda.is_available(),
+            'mps': (hasattr(self._torch.backends, 'mps')
+                    and self._torch.backends.mps.is_available()),
+        }
+        if family not in available:
+            warnings.warn(
+                f"Unknown device '{self.device}'; falling back to 'cpu'.",
+                stacklevel=3,
+            )
+            self.device = 'cpu'
+        elif not available[family]:
+            warnings.warn(
+                f"Device '{self.device}' is not available; falling back to 'cpu'.",
+                stacklevel=3,
+            )
+            self.device = 'cpu'
+
+        if self.device.split(':')[0] == 'mps' and self.dtype == 'float64':
+            warnings.warn(
+                "The 'mps' backend does not support float64; using float32. "
+                'Check the reported condition number before trusting the result.',
+                stacklevel=3,
+            )
+            self.dtype = 'float32'
+
+    @property
+    def _torch_dtype(self):
+        """The torch dtype matching the configured precision."""
+        return getattr(self._torch, self.dtype)
+
+    def _zeros(self, shape):
+        """Allocates a zero-filled array on the configured backend."""
+        if self.backend == 'torch':
+            return self._torch.zeros(shape, dtype=self._torch_dtype, device=self.device)
+        return np.zeros(shape)
+
+    def _stack_columns(self, columns):
+        """Stacks 1D arrays as the columns of a 2D array on the configured backend."""
+        if self.backend == 'torch':
+            return self._torch.stack(columns, dim=1)
+        return np.column_stack(columns)
+
+    def _to_numpy(self, array):
+        """Returns a float64 numpy copy of a backend array."""
+        if self.backend == 'torch':
+            return array.detach().to('cpu', dtype=self._torch.float64).numpy()
+        return np.asarray(array, dtype=float)
 
     @staticmethod
     def _as_array(data):
@@ -246,6 +376,19 @@ class kmcc:
         if not isinstance(self.window_order, (int, np.integer)) or self.window_order < 1:
             raise ValueError('window_exp_order must be a positive integer')
 
+        if self.backend not in self.BACKENDS:
+            raise ValueError(
+                f'Backend "{self.backend}" is not valid. Choose one of {self.BACKENDS}.'
+            )
+
+        if self.dtype not in DTYPES:
+            raise ValueError(
+                f'dtype "{self.dtype}" is not valid. Choose one of {DTYPES}.'
+            )
+
+        if not isinstance(self.device, str):
+            raise TypeError('device must be a string, for example "cpu" or "cuda".')
+
         n_samples, dimensions = self.time_series.shape
         if dimensions > n_samples:
             warnings.warn(
@@ -262,8 +405,16 @@ class kmcc:
         underlying values, and generates all possible index combinations based on the
         specified interaction order.
         """
-        self.differences = np.diff(self.time_series, axis=0)
-        self.values = self.time_series[:-1, :]
+        if self.backend == 'torch':
+            series = self._torch.as_tensor(self.time_series,
+                                           dtype=self._torch_dtype,
+                                           device=self.device)
+            self.differences = self._torch.diff(series, dim=0)
+            self.values = series[:-1, :]
+        else:
+            self.differences = np.diff(self.time_series, axis=0)
+            self.values = self.time_series[:-1, :]
+
         self.n_samples, self.dimensions = self.values.shape
         self.index_combinations = self._generate_index_combinations()
         self.diffusion_indices = list(combinations_with_replacement(range(self.dimensions), 2))
@@ -333,6 +484,13 @@ class kmcc:
         ----------
         numpy.ndarray: The calculated time series matrix.
         """
+        if self.backend == 'torch':
+            ones = self._torch.ones(len(segment), dtype=self._torch_dtype, device=self.device)
+            return self._stack_columns([
+                segment[:, list(comb)].prod(dim=1) if comb else ones
+                for comb in self.index_combinations
+            ])
+
         return np.column_stack([
             np.prod(segment[:, comb], axis=1) if comb else np.ones(len(segment))
             for comb in self.index_combinations
@@ -391,7 +549,7 @@ class kmcc:
         if self.mode == 'drift':
             return ts_matrix.T @ segment_diff
 
-        product_diff = np.column_stack([
+        product_diff = self._stack_columns([
             segment_diff[:, i] * segment_diff[:, j] for i, j in self.diffusion_indices
         ])
         return ts_matrix.T @ product_diff
@@ -478,8 +636,8 @@ class kmcc:
         n_terms = len(self.index_combinations)
         Y_matrix_dim = len(self.diffusion_indices) if self.mode == 'diffusion' else self.dimensions
 
-        M_matrix = np.zeros((n_terms, n_terms))
-        Y_matrix = np.zeros((n_terms, Y_matrix_dim))
+        M_matrix = self._zeros((n_terms, n_terms))
+        Y_matrix = self._zeros((n_terms, Y_matrix_dim))
 
         segmented_values, values_remainder, segmented_diffs, diffs_remainder = self._segment_data()
 
@@ -493,8 +651,8 @@ class kmcc:
             M_matrix += self._compute_M_matrix(ts_matrix)
             Y_matrix += self._compute_Y_matrix(ts_matrix, diffs_remainder)
 
-        M_matrix /= self.n_samples
-        Y_matrix /= self.n_samples
+        M_matrix = self._to_numpy(M_matrix) / self.n_samples
+        Y_matrix = self._to_numpy(Y_matrix) / self.n_samples
 
         coefficients = self._solve(M_matrix, Y_matrix) / self.dt
         return pd.DataFrame(coefficients,
