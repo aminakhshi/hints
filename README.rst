@@ -22,22 +22,22 @@ al. (2023) <https://iopscience.iop.org/article/10.1088/1367-2630/acec63/meta>`_
 Features
 --------
 
-- **Universality and applications**: This package is designed to be
-  user-friendly and accessible to a wide range of users, including
-  researchers and practitioners from various fields such as physics,
-  biology, economics, climatology, and engineering, etc.
-- **Multidimensional Time Series Processing**: Capable of handling and
-  analyzing data measured from subsystems of a complex system.
-- **Higher-Order Interaction Detection**: Identifies the directions and
-  strengths of interactions, encompassing both pairwise and higher-order
-  interactions within a complex system.
-- **Identification and Quantification of Directions and Strength of
-  Interactions**: Quantifies both the strengths and directions of
-  interactions in various orders within both the deterministic and
-  stochastic components of a complex system dynamics.
-- **Robust Mathematical Foundation**: Based on a solid theoretical
-  framework involving estimations of Kramers-Moyal coefficients from
-  N-dimensional time series.
+-  **Universality and applications**: This package is designed to be
+   user-friendly and accessible to a wide range of users, including
+   researchers and practitioners from various fields such as physics,
+   biology, economics, climatology, and engineering, etc.
+-  **Multidimensional Time Series Processing**: Capable of handling and
+   analyzing data measured from subsystems of a complex system.
+-  **Higher-Order Interaction Detection**: Identifies the directions and
+   strengths of interactions, encompassing both pairwise and
+   higher-order interactions within a complex system.
+-  **Identification and Quantification of Directions and Strength of
+   Interactions**: Quantifies both the strengths and directions of
+   interactions in various orders within both the deterministic and
+   stochastic components of a complex system dynamics.
+-  **Robust Mathematical Foundation**: Based on a solid theoretical
+   framework involving estimations of Kramers-Moyal coefficients from
+   N-dimensional time series.
 
 Installation
 ------------
@@ -130,10 +130,10 @@ please check out our `contribution guidelines <#>`__.
 Authors
 -------
 
-- Amin Akhshi (amin.akhshi@gmail.com)
-- Fatemeh Nikpanjeh (f.nikp77@gmail.com)
-- Farnik Nikakhtar (farnik.nikakhtar@yale.edu)
-- Laya Parkavousi (laya.parkavousi@ds.mpg.de)
+-  Amin Akhshi (amin.akhshi@gmail.com)
+-  Fatemeh Nikpanjeh (f.nikp77@gmail.com)
+-  Farnik Nikakhtar (farnik.nikakhtar@yale.edu)
+-  Laya Parkavousi (laya.parkavousi@ds.mpg.de)
 
 Version History
 ---------------
@@ -143,22 +143,22 @@ For a detailed list of changes for each version of the project, see the
 stage and there might be some bugs and issues. We are working on
 improving the package and adding more features.
 
-- 0.1.3
+-  0.1.3
 
-  - Reconstruction of the noise amplitude matrix ``G(x)`` from the
-    diffusion coefficients
-  - Fixed loading time series from a file, which previously raised a
-    ``TypeError``
-  - Consistent coefficient labels (``F_x1...``, ``D_x1x1...``) and
-    clearer input validation
-  - Reports the condition number of the moment matrix and offers
-    least-squares solvers
-  - Optional PyTorch backend for large datasets, and a regression test
-    suite
+   -  Reconstruction of the noise amplitude matrix ``G(x)`` from the
+      diffusion coefficients
+   -  Fixed loading time series from a file, which previously raised a
+      ``TypeError``
+   -  Consistent coefficient labels (``F_x1...``, ``D_x1x1...``) and
+      clearer input validation
+   -  Reports the condition number of the moment matrix and offers
+      least-squares solvers
+   -  Optional PyTorch backend for large datasets, and a regression test
+      suite
 
-- 0.1.x(2024-04-01)
+-  0.1.x(2024-04-01)
 
-  - Initial beta release
+   -  Initial beta release
 
 Citation
 --------
