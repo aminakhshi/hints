@@ -1,7 +1,8 @@
+sphinx>=7.0,<8
 myst_parser>=0.15.2
 sphinxcontrib-bibtex>=2.4.1
 nbsphinx
 nbsphinx_link
-pandoc
 groundwork-sphinx-theme
-
+# Provides the 'ipython3' Pygments lexer used by the notebook examples.
+ipython

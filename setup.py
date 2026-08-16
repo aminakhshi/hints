@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import re
 
 def get_version():
-    default_ver = '0.1.2'
+    default_ver = '0.1.3'
     try:
         with open('hints/__init__.py', 'r') as f:
             version_ = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", f.read(), re.M)
@@ -25,11 +25,16 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/aminakhshi/hints',
-    packages = find_packages(exclude=["misc*", "result*", "data*", "tests*"]),
+    packages = find_packages(exclude=["misc*", "result*", "data*", "tests*", "examples*"]),
     install_requires=get_requirements(),
     extras_require={
-        # Optional GPU/HPC backend. The estimator runs on numpy by default.
+        # Optional GPU/HPC backend. The estimator runs on numpy by default, so
+        # this is never needed to install or use the package.
         'torch': ['torch>=1.10'],
+        # Only needed to run the notebooks under examples/, which simulate the
+        # benchmark systems. jitcsde is compiled, so it is deliberately kept out
+        # of the mandatory requirements.
+        'examples': ['jitcsde', 'sympy', 'tqdm', 'ipykernel'],
         'dev': ['pytest>=7.0'],
     },
     classifiers=[
