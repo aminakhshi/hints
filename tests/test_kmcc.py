@@ -21,6 +21,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hints.hints import kmcc
 
+try:  # The torch backend is optional, so its tests are skipped when absent.
+    import torch
+except ImportError:
+    torch = None
+
+requires_torch = pytest.mark.skipif(torch is None, reason='PyTorch is not installed')
+requires_cuda = pytest.mark.skipif(
+    torch is None or not torch.cuda.is_available(), reason='No CUDA device available'
+)
+
 DT = 0.01
 DRIFT_MATRIX = np.array([[-1.0, 0.5], [-0.5, -2.0]])
 NOISE_AMPLITUDE = np.array([0.5, 0.8])
@@ -229,6 +239,88 @@ def test_rank_deficient_expansion_warns():
     series = np.random.default_rng(9).standard_normal((12, 4))
     with pytest.warns(UserWarning, match='rank deficient'):
         kmcc(ts_array=series, dt=DT, interaction_order=[0, 1, 2, 3])
+
+
+@requires_torch
+def test_torch_backend_matches_numpy(ou_series):
+    """The optional backend must not change the estimated coefficients."""
+    for mode, order in (('drift', [0, 1, 2]), ('diffusion', [0])):
+        reference = kmcc(ts_array=ou_series, dt=DT, interaction_order=order,
+                         estimation_mode=mode).get_coefficients()
+        accelerated = kmcc(ts_array=ou_series, dt=DT, interaction_order=order,
+                           estimation_mode=mode, backend='torch',
+                           device='cpu').get_coefficients()
+
+        assert list(accelerated.index) == list(reference.index)
+        assert list(accelerated.columns) == list(reference.columns)
+        assert np.allclose(accelerated.to_numpy(), reference.to_numpy(), rtol=1e-9, atol=1e-11)
+
+
+@requires_torch
+def test_torch_single_precision_stays_close(ou_series):
+    """Single precision trades accuracy for speed but must stay usable."""
+    reference = kmcc(ts_array=ou_series, dt=DT, interaction_order=[1]).get_coefficients()
+    reduced = kmcc(ts_array=ou_series, dt=DT, interaction_order=[1], backend='torch',
+                   device='cpu', dtype='float32').get_coefficients()
+
+    assert np.allclose(reduced.to_numpy(), reference.to_numpy(), atol=1e-3)
+
+
+@requires_cuda
+def test_cuda_backend_matches_numpy(ou_series):
+    """Results computed on the GPU must match the CPU reference."""
+    reference = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0, 1, 2]).get_coefficients()
+    on_gpu = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0, 1, 2],
+                  backend='torch', device='cuda').get_coefficients()
+
+    assert np.allclose(on_gpu.to_numpy(), reference.to_numpy(), rtol=1e-8, atol=1e-10)
+
+
+@requires_torch
+def test_unavailable_device_falls_back_to_cpu():
+    """An unknown device is a warning and a fallback, never a crash."""
+    series = np.random.default_rng(10).standard_normal((500, 2))
+    with pytest.warns(UserWarning, match="Unknown device"):
+        calculator = kmcc(ts_array=series, dt=DT, interaction_order=[1],
+                          backend='torch', device='definitely_not_a_device')
+    assert calculator.device == 'cpu'
+    assert calculator.backend == 'torch'
+    assert calculator.get_coefficients().shape == (2, 2)
+
+
+def test_torch_backend_falls_back_when_unavailable(monkeypatch):
+    """Without PyTorch installed the backend degrades to numpy with a warning."""
+    monkeypatch.setattr('hints.hints._load_torch', lambda: None)
+    series = np.random.default_rng(11).standard_normal((500, 2))
+
+    with pytest.warns(UserWarning, match='PyTorch is not installed'):
+        calculator = kmcc(ts_array=series, dt=DT, interaction_order=[1], backend='torch')
+
+    assert calculator.backend == 'numpy'
+    assert calculator.get_coefficients().shape == (2, 2)
+
+
+@pytest.mark.parametrize('kwargs, message', [
+    ({'backend': 'jax'}, 'is not valid'),
+    ({'dtype': 'float16'}, 'is not valid'),
+])
+def test_invalid_backend_options_raise(kwargs, message):
+    series = np.random.default_rng(12).standard_normal((100, 2))
+    with pytest.raises(ValueError, match=message):
+        kmcc(ts_array=series, dt=DT, **kwargs)
+
+
+def test_numpy_backend_does_not_import_torch():
+    """The default path must not pay the cost of importing PyTorch."""
+    import subprocess
+    code = (
+        'import sys; import hints; import numpy as np; '
+        'hints.kmcc(ts_array=np.random.rand(200, 2), dt=0.1).get_coefficients(); '
+        'print("torch" in sys.modules)'
+    )
+    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
+                            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    assert result.stdout.strip().endswith('False'), result.stdout + result.stderr
 
 
 if __name__ == '__main__':
