@@ -13,8 +13,26 @@ def get_version():
     return default_ver
 
 def get_requirements():
-    with open('requirements.txt') as req:
-        return req.read().splitlines()
+    try:
+        with open('requirements.txt') as req:
+            return [line.strip() for line in req if line.strip() and not line.startswith('#')]
+    except FileNotFoundError:
+        # Keep the build working if the file is missing from a source tree.
+        return ['numpy', 'pandas', 'scipy', 'matplotlib', 'seaborn']
+
+
+def get_long_description():
+    for filename, content_type in (('README.md', 'text/markdown'),
+                                   ('README.rst', 'text/x-rst')):
+        try:
+            with open(filename, encoding='utf-8') as handle:
+                return handle.read(), content_type
+        except FileNotFoundError:
+            continue
+    return '', 'text/plain'
+
+
+LONG_DESCRIPTION, LONG_DESCRIPTION_TYPE = get_long_description()
 
 setup(
     name='hints-kmcs',
@@ -22,8 +40,8 @@ setup(
     author='Amin Akhshi',
     author_email='amin.akhshi@gmail.com',
     description='A package for calculating pairwise and higher-order interactions of N-dimensional state variables from measured time series',
-    long_description=open('README.md').read(),
-    long_description_content_type='text/markdown',
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type=LONG_DESCRIPTION_TYPE,
     url='https://github.com/aminakhshi/hints',
     packages = find_packages(exclude=["misc*", "result*", "data*", "tests*", "examples*"]),
     install_requires=get_requirements(),
