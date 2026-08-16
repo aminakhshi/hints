@@ -103,6 +103,18 @@ al. (2024) <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.14.011050>`_
    # Display the results
    print(interaction_coefficients)
 
+In diffusion mode, ``get_coefficients()`` returns the expansion of
+``D^(2)(x)``. The noise amplitude ``G(x)`` of the Langevin equation,
+defined by ``G G^T = D^(2)``, can be obtained directly from the same
+calculator:
+
+.. code:: python
+
+   diffusion = hints.kmcc('example.csv', dt=dt, interaction_order=[0], estimation_mode='diffusion')
+
+   D = diffusion.get_diffusion_matrix()   # (n_points, N, N)
+   G = diffusion.get_noise_amplitude()    # (n_points, N, N), lower triangular by default
+
 Documentation
 -------------
 
@@ -133,6 +145,8 @@ improving the package and adding more features.
 
 - 0.1.3
 
+  - Reconstruction of the noise amplitude matrix ``G(x)`` from the
+    diffusion coefficients
   - Fixed loading time series from a file, which previously raised a
     ``TypeError``
   - Consistent coefficient labels (``F_x1...``, ``D_x1x1...``) and

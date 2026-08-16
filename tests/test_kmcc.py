@@ -3,7 +3,7 @@ Regression tests for the Kramers-Moyal coefficient calculator.
 
 The tests estimate coefficients for linear stochastic differential equations
 whose drift and diffusion are known analytically, and check the bookkeeping
-that surrounds the estimator (input handling, segmentation, labelling).
+that surrounds the estimator (input handling, segmentation, labeling).
 
 Run with ``pytest`` or directly with ``python tests/test_kmcc.py``.
 """
@@ -44,7 +44,7 @@ DIFFUSION_TOLERANCE = 0.02
 
 
 def simulate_ornstein_uhlenbeck(n_samples=1200000, seed=0):
-    """Euler-Maruyama realisation of dx = A x dt + sigma dW."""
+    """Euler-Maruyama realization of dx = A x dt + sigma dW."""
     rng = np.random.default_rng(seed)
     increments = rng.standard_normal((n_samples, 2)) * (NOISE_AMPLITUDE * np.sqrt(DT))
     series = np.zeros((n_samples, 2))
@@ -239,6 +239,108 @@ def test_rank_deficient_expansion_warns():
     series = np.random.default_rng(9).standard_normal((12, 4))
     with pytest.warns(UserWarning, match='rank deficient'):
         kmcc(ts_array=series, dt=DT, interaction_order=[0, 1, 2, 3])
+
+
+def test_noise_amplitude_recovers_additive_noise(ou_series):
+    """G(x) must satisfy G G^T = D and recover the simulated noise amplitudes."""
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                      estimation_mode='diffusion')
+    origin = np.zeros((1, 2))
+
+    diffusion = calculator.get_diffusion_matrix(states=origin)
+    amplitude = calculator.get_noise_amplitude(states=origin)
+
+    assert diffusion.shape == (1, 2, 2)
+    assert np.allclose(diffusion[0], diffusion[0].T)
+    assert np.allclose(amplitude[0] @ amplitude[0].T, diffusion[0])
+    assert np.allclose(np.diag(amplitude[0]), NOISE_AMPLITUDE, atol=DIFFUSION_TOLERANCE)
+    # The default factorization is the lower triangular one used in the papers.
+    assert np.isclose(amplitude[0][0, 1], 0.0)
+
+
+def test_noise_amplitude_defaults_to_observed_states(ou_series):
+    """Without explicit states, G is evaluated at every observed sample."""
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                      estimation_mode='diffusion')
+    amplitude = calculator.get_noise_amplitude()
+
+    assert amplitude.shape == (len(ou_series) - 1, 2, 2)
+    # Additive noise, so G does not vary across the state space.
+    assert np.allclose(amplitude, amplitude[0])
+
+
+def test_noise_amplitude_tracks_state_dependent_diffusion():
+    """A multiplicative-noise system must give the right G at several states."""
+    rng = np.random.default_rng(20)
+    dt, n_samples = 0.005, 400000
+    series = np.zeros((n_samples, 1))
+    state = np.zeros(1)
+    for index in range(n_samples):
+        amplitude = np.sqrt(0.1 + 0.4 * state ** 2)
+        state = state + (state - state ** 3) * dt + amplitude * np.sqrt(dt) * rng.standard_normal(1)
+        series[index] = state
+
+    calculator = kmcc(ts_array=series, dt=dt, interaction_order=[0, 1, 2],
+                      estimation_mode='diffusion')
+    query = np.array([[-1.0], [0.0], [1.0]])
+    estimated = calculator.get_noise_amplitude(states=query)[:, 0, 0]
+    expected = np.sqrt(0.1 + 0.4 * query.ravel() ** 2)
+
+    assert np.allclose(estimated, expected, atol=0.05)
+
+
+def test_noise_amplitude_methods_agree(ou_series):
+    """Both factorizations differ by an orthogonal transform, so G G^T matches."""
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                      estimation_mode='diffusion')
+    states = np.zeros((1, 2))
+
+    products = []
+    for method in ('cholesky', 'sqrt'):
+        amplitude = calculator.get_noise_amplitude(states=states, method=method)
+        products.append(amplitude[0] @ amplitude[0].T)
+
+    assert np.allclose(products[0], products[1])
+
+
+def test_diffusion_helpers_reject_drift_mode(ou_series):
+    """The helpers are meaningless for a drift fit and must say so."""
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0])
+    with pytest.raises(ValueError, match="estimation_mode='diffusion'"):
+        calculator.get_diffusion_matrix()
+
+
+def test_noise_amplitude_rejects_unknown_method(ou_series):
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                      estimation_mode='diffusion')
+    with pytest.raises(ValueError, match="method must be"):
+        calculator.get_noise_amplitude(method='lu')
+
+
+def test_diffusion_matrix_validates_state_shape(ou_series):
+    calculator = kmcc(ts_array=ou_series, dt=DT, interaction_order=[0],
+                      estimation_mode='diffusion')
+    with pytest.raises(ValueError, match='to match the fitted model'):
+        calculator.get_diffusion_matrix(states=np.zeros((4, 3)))
+
+
+def test_non_psd_diffusion_is_clipped_with_warning():
+    """An indefinite estimate must warn rather than produce a silent NaN."""
+    rng = np.random.default_rng(21)
+    series = np.cumsum(rng.standard_normal((5000, 1)) * 0.01, axis=0)
+    calculator = kmcc(ts_array=series, dt=0.01, interaction_order=[0, 1],
+                      estimation_mode='diffusion')
+
+    # Force an indefinite diffusion by supplying a negative constant term.
+    coefficients = calculator.get_coefficients()
+    coefficients.iloc[:, :] = 0.0
+    coefficients.iloc[0, 0] = -1.0
+
+    with pytest.warns(UserWarning, match='not positive semidefinite'):
+        amplitude = calculator.get_noise_amplitude(states=np.zeros((1, 1)),
+                                                   coefficients=coefficients)
+    assert np.all(np.isfinite(amplitude))
+    assert np.allclose(amplitude, 0.0)
 
 
 @requires_torch

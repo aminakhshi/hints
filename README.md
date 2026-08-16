@@ -65,6 +65,17 @@ interaction_coefficients = calulator.get_coefficients()
 print(interaction_coefficients)
 ```
 
+In diffusion mode, `get_coefficients()` returns the expansion of `D^(2)(x)`. The
+noise amplitude `G(x)` of the Langevin equation, defined by `G G^T = D^(2)`, can
+be obtained directly from the same calculator:
+
+```python
+diffusion = hints.kmcc('example.csv', dt=dt, interaction_order=[0], estimation_mode='diffusion')
+
+D = diffusion.get_diffusion_matrix()   # (n_points, N, N)
+G = diffusion.get_noise_amplitude()    # (n_points, N, N), lower triangular by default
+```
+
 ## Documentation
 
 For more detailed usage and API documentation, please refer to our [documentation](https://hints.readthedocs.io/en/latest/index.html).
@@ -85,6 +96,7 @@ We welcome contributions from the community. If you wish to contribute, please c
 For a detailed list of changes for each version of the project, see the [Changelog](./CHANGELOG.md). Currently, the project is in the beta stage and there might be some bugs and issues. We are working on improving the package and adding more features.
 
 * 0.1.3
+    * Reconstruction of the noise amplitude matrix `G(x)` from the diffusion coefficients
     * Fixed loading time series from a file, which previously raised a `TypeError`
     * Consistent coefficient labels (`F_x1...`, `D_x1x1...`) and clearer input validation
     * Reports the condition number of the moment matrix and offers least-squares solvers

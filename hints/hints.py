@@ -656,3 +656,142 @@ class kmcc:
         return pd.DataFrame(coefficients,
                             index=self._construct_keys(),
                             columns=self._construct_columns())
+
+    def _evaluate_terms(self, states):
+        """
+        Evaluates the polynomial basis at arbitrary points of the state space.
+
+        Args
+        ----------
+        states (array-like):
+            Points shaped (n_points, dimensions) at which to evaluate the basis.
+
+        Returns
+        ----------
+        numpy.ndarray: The design matrix of shape (n_points, n_terms).
+        """
+        states = self._as_array(states)
+        if states.shape[1] != self.dimensions:
+            raise ValueError(
+                f'states must have {self.dimensions} columns to match the fitted '
+                f'model; got {states.shape[1]}.'
+            )
+        return np.column_stack([
+            np.prod(states[:, comb], axis=1) if comb else np.ones(len(states))
+            for comb in self.index_combinations
+        ])
+
+    def get_diffusion_matrix(self, states=None, coefficients=None):
+        r"""
+        Evaluates the diffusion matrix :math:`D^{(2)}(x)` at given states.
+
+        :meth:`get_coefficients` returns the coefficients of the polynomial
+        expansion of the diffusion. This assembles them back into the symmetric
+        matrix :math:`D^{(2)}_{ij}(x)` at each requested point.
+
+        Args
+        ----------
+        states (array-like, optional):
+            Points shaped (n_points, dimensions) at which to evaluate the matrix.
+            Defaults to the observed time series.
+        coefficients (pandas.DataFrame, optional):
+            Previously computed diffusion coefficients. Recomputed when omitted.
+
+        Returns
+        ----------
+        numpy.ndarray: Diffusion matrices with shape (n_points, dimensions, dimensions).
+
+        Raises
+        ----------
+        ValueError: If the calculator was not created with ``estimation_mode='diffusion'``.
+        """
+        if self.mode != 'diffusion':
+            raise ValueError(
+                "The diffusion matrix requires estimation_mode='diffusion'; "
+                f"this calculator was created with estimation_mode='{self.mode}'."
+            )
+
+        if coefficients is None:
+            coefficients = self.get_coefficients()
+        if states is None:
+            states = self.time_series[:-1, :]
+
+        terms = self._evaluate_terms(states)
+        entries = terms @ np.asarray(coefficients, dtype=float)
+
+        matrices = np.zeros((entries.shape[0], self.dimensions, self.dimensions))
+        for position, (i, j) in enumerate(self.diffusion_indices):
+            matrices[:, i, j] = entries[:, position]
+            matrices[:, j, i] = entries[:, position]
+        return matrices
+
+    def get_noise_amplitude(self, states=None, method='cholesky', coefficients=None):
+        r"""
+        Computes the noise amplitude matrix :math:`G(x)` with :math:`G G^{T} = D^{(2)}`.
+
+        The estimator gives :math:`D^{(2)}`, whereas the Langevin equation
+        :math:`\dot{x} = F(x) + G(x)\eta(t)` contains :math:`G`. This performs the
+        factorization described in Appendix E of Tabar et al. (2024) and in the
+        supplementary material of Rahimi Tabar and co-workers (2025). Since
+        :math:`G` is defined only up to an orthogonal transformation, two
+        conventional choices are offered.
+
+        Args
+        ----------
+        states (array-like, optional):
+            Points shaped (n_points, dimensions) at which to evaluate :math:`G`.
+            Defaults to the observed time series.
+        method (str):
+            'cholesky' (default) returns the lower triangular factor used in the
+            papers; 'sqrt' returns the symmetric positive semidefinite square root.
+        coefficients (pandas.DataFrame, optional):
+            Previously computed diffusion coefficients. Recomputed when omitted.
+
+        Returns
+        ----------
+        numpy.ndarray: Noise amplitudes with shape (n_points, dimensions, dimensions).
+
+        Notes
+        ----------
+        An estimated diffusion matrix is not guaranteed to be positive
+        semidefinite, since nothing in the linear system constrains it. Negative
+        eigenvalues are clipped to zero before factorization and reported as a
+        warning; a large negative eigenvalue means the diffusion estimate itself
+        should not be trusted at those states.
+        """
+        if method not in ('cholesky', 'sqrt'):
+            raise ValueError(f"method must be 'cholesky' or 'sqrt'; got '{method}'.")
+
+        matrices = self.get_diffusion_matrix(states=states, coefficients=coefficients)
+
+        # Symmetrize against round-off, then project onto the semidefinite cone.
+        matrices = 0.5 * (matrices + np.transpose(matrices, (0, 2, 1)))
+        eigenvalues, eigenvectors = np.linalg.eigh(matrices)
+
+        most_negative = eigenvalues.min() if eigenvalues.size else 0.0
+        if most_negative < 0:
+            scale = np.abs(eigenvalues).max() or 1.0
+            warnings.warn(
+                f'The estimated diffusion matrix is not positive semidefinite at some '
+                f'states (most negative eigenvalue {most_negative:.3e}, '
+                f'{abs(most_negative) / scale:.1%} of the largest magnitude). '
+                'Negative eigenvalues were clipped to zero before factorization.',
+                stacklevel=2,
+            )
+        eigenvalues = np.clip(eigenvalues, 0.0, None)
+
+        if method == 'sqrt':
+            roots = eigenvectors * np.sqrt(eigenvalues)[:, np.newaxis, :]
+            return roots @ np.transpose(eigenvectors, (0, 2, 1))
+
+        # Cholesky needs a strictly positive definite matrix, so factorize the
+        # projected matrix and fall back to the symmetric root where it is singular.
+        projected = (eigenvectors * eigenvalues[:, np.newaxis, :]) @ np.transpose(eigenvectors, (0, 2, 1))
+        amplitudes = np.empty_like(projected)
+        for index, matrix in enumerate(projected):
+            try:
+                amplitudes[index] = np.linalg.cholesky(matrix)
+            except np.linalg.LinAlgError:
+                values, vectors = np.linalg.eigh(matrix)
+                amplitudes[index] = (vectors * np.sqrt(np.clip(values, 0.0, None))) @ vectors.T
+        return amplitudes

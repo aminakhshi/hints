@@ -53,6 +53,38 @@ Diffusion coefficients are returned as
 that is, **without** a factor of one half, so for additive noise the estimate is
 :math:`(G G^{T})_{ij}` directly.
 
+Recovering the noise amplitude G(x)
+-----------------------------------
+
+``get_coefficients`` in diffusion mode returns the coefficients of the expansion
+of :math:`D^{(2)}`. The Langevin equation
+:math:`\dot{x} = F(x) + G(x)\eta(t)` contains :math:`G`, which is the factor
+satisfying :math:`G G^{T} = D^{(2)}` rather than :math:`D^{(2)}` itself. Both are
+available directly:
+
+.. code-block:: python
+
+   diffusion = hints.kmcc(ts_array=data, dt=0.01, interaction_order=[0],
+                          estimation_mode='diffusion')
+
+   D = diffusion.get_diffusion_matrix()    # (n_points, N, N)
+   G = diffusion.get_noise_amplitude()     # (n_points, N, N)
+
+By default both are evaluated at the observed samples; pass ``states=`` to
+evaluate them anywhere in state space. :math:`G` is defined only up to an
+orthogonal transformation, so ``method='cholesky'`` (the default) returns the
+lower triangular factor used in :cite:`revealing2024`, and ``method='sqrt'``
+returns the symmetric square root.
+
+For strictly positive data, ``interaction_order=[1]`` is usually the appropriate
+choice; for data containing both positive and negative values, start from
+``interaction_order=[0]``.
+
+Nothing in the linear system constrains the estimated :math:`D^{(2)}` to be
+positive semidefinite. Negative eigenvalues are clipped to zero before
+factorization and reported as a warning; a large negative eigenvalue indicates
+that the diffusion estimate itself is unreliable at those states.
+
 Numerical diagnostics
 ---------------------
 
