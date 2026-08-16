@@ -3,35 +3,41 @@ HiNTS (Higher-Order Interactions in N-Dimensional Time Series)
 
 This repository hosts the source code and tutorial notebooks for HiNTS,
 a Python package dedicated to the sophisticated analysis of complex
-systems via multidimensional time series data :cite:`hints2024`. It offers a set of
-functions and tools for detecting and quantifying the directions and
-strengths of interactions in both deterministic and stochastic
-interactions within complex systems, encompassing pairwise to
-higher-order interactions :cite:`hints2024,revealing2024`. The main function uses a data-driven approach
-for characterizing interactions of different orders based on solving a
-set of linear equations constructed from Kramers-Moyal coefficients
-derived from statistical moments of N-dimensional multivariate time
-series. It makes use of the method described by :cite:`hints2024,revealing2024,nikakhtar2023data`.
+systems via multidimensional time series data `Akhshi et
+al. (2024) <#>`__. It offers a set of functions and tools for detecting
+and quantifying the directions and strengths of interactions in both
+deterministic and stochastic interactions within complex systems,
+encompassing pairwise to higher-order interactions (`Akhshi et
+al. (2024) <#>`__ & `Tabar et
+al. (2024) <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.14.011050>`__).
+The main function uses a data-driven approach for characterizing
+interactions of different orders based on solving a set of linear
+equations constructed from Kramers-Moyal coefficients derived from
+statistical moments of N-dimensional multivariate time series. It makes
+use of the method described by (`Akhshi et al. (2024) <#>`__, `Tabar et
+al. (2024) <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.14.011050>`__,
+and `Nikakhtar et
+al. (2023) <https://iopscience.iop.org/article/10.1088/1367-2630/acec63/meta>`__).
 
 Features
 --------
 
--  **Universality and applications**: This package is designed to be
-   user-friendly and accessible to a wide range of users, including
-   researchers and practitioners from various fields such as physics,
-   biology, economics, climatology, and engineering, etc.
--  **Multidimensional Time Series Processing**: Capable of handling and
-   analyzing data measured from subsystems of a complex system.
--  **Higher-Order Interaction Detection**: Identifies the directions and
-   strengths of interactions, encompassing both pairwise and
-   higher-order interactions within a complex system.
--  **Identification and Quantification of Directions and Strength of
-   Interactions**: Quantifies both the strengths and directions of
-   interactions in various orders within both the deterministic and
-   stochastic components of a complex system dynamics.
--  **Robust Mathematical Foundation**: Based on a solid theoretical
-   framework involving estimations of Kramers-Moyal coefficients from
-   N-dimensional time series.
+- **Universality and applications**: This package is designed to be
+  user-friendly and accessible to a wide range of users, including
+  researchers and practitioners from various fields such as physics,
+  biology, economics, climatology, and engineering, etc.
+- **Multidimensional Time Series Processing**: Capable of handling and
+  analyzing data measured from subsystems of a complex system.
+- **Higher-Order Interaction Detection**: Identifies the directions and
+  strengths of interactions, encompassing both pairwise and higher-order
+  interactions within a complex system.
+- **Identification and Quantification of Directions and Strength of
+  Interactions**: Quantifies both the strengths and directions of
+  interactions in various orders within both the deterministic and
+  stochastic components of a complex system dynamics.
+- **Robust Mathematical Foundation**: Based on a solid theoretical
+  framework involving estimations of Kramers-Moyal coefficients from
+  N-dimensional time series.
 
 Installation
 ------------
@@ -50,14 +56,30 @@ install using the setup script:
 
    git clone https://github.com/aminakhshi/hints.git
    cd hints
-   python setup.py install
+   pip install .
+
+``HiNTS`` runs on NumPy and needs no GPU. If you work with long
+multivariate records and have one available, you can optionally install
+the PyTorch backend and pass ``backend='torch', device='cuda'`` to move
+the heavy moment accumulation onto the GPU:
+
+.. code:: bash
+
+   pip install hints-kmcs[torch]
+
+This is entirely optional: the standard installation above never
+requires PyTorch or a GPU, and the results are the same either way. To
+run the example notebooks, install the extras they need with
+``pip install hints-kmcs[examples]``.
 
 Usage
 -----
 
 Below is a basic example of using ``HiNTS``. For more detailed examples
 and tutorials, please refer to our documentation at
-`notebooks </examples>`__ and the corresponding papers :cite:`hints2024,revealing2024`:
+`notebooks </examples>`__ and the corresponding papers `Akhshi et
+al. (2024) <#>`__ and `Tabar et
+al. (2024) <https://journals.aps.org/prx/abstract/10.1103/PhysRevX.14.011050>`__.
 
 .. code:: python
 
@@ -74,12 +96,24 @@ and tutorials, please refer to our documentation at
 
    calulator = hints.kmcc('example.csv', dt=dt, interaction_order=[0,1,2], estimation_mode='drift')
 
-   
+      
    # Computing interaction coefficients
    interaction_coefficients = calulator.get_coefficients()
 
    # Display the results
    print(interaction_coefficients)
+
+In diffusion mode, ``get_coefficients()`` returns the expansion of
+``D^(2)(x)``. The noise amplitude ``G(x)`` of the Langevin equation,
+defined by ``G G^T = D^(2)``, can be obtained directly from the same
+calculator:
+
+.. code:: python
+
+   diffusion = hints.kmcc('example.csv', dt=dt, interaction_order=[0], estimation_mode='diffusion')
+
+   D = diffusion.get_diffusion_matrix()   # (n_points, N, N)
+   G = diffusion.get_noise_amplitude()    # (n_points, N, N), lower triangular by default
 
 Documentation
 -------------
@@ -96,26 +130,40 @@ please check out our `contribution guidelines <#>`__.
 Authors
 -------
 
--  Amin Akhshi (amin.akhshi@gmail.com)
--  Fatemeh Nikpanjeh (f.nikp77@gmail.com)
--  Farnik Nikakhtar (farnik.nikakhtar@yale.edu)
--  Laya Parkavousi (laya.parkavousi@ds.mpg.de)
+- Amin Akhshi (amin.akhshi@gmail.com)
+- Fatemeh Nikpanjeh (f.nikp77@gmail.com)
+- Farnik Nikakhtar (farnik.nikakhtar@yale.edu)
+- Laya Parkavousi (laya.parkavousi@ds.mpg.de)
 
 Version History
 ---------------
 
-For a detailed list of changes for each version of the project, see the `Changelog <./CHANGELOG.md>`__. Currently, the project is in the beta stage and there might be some bugs and issues. We are working on improving the package and adding more features.
+For a detailed list of changes for each version of the project, see the
+`Changelog <./CHANGELOG.md>`__. Currently, the project is in the beta
+stage and there might be some bugs and issues. We are working on
+improving the package and adding more features.
 
--  0.1.x(2024-04-01)
+- 0.1.3
 
-   -  Initial beta release
+  - Reconstruction of the noise amplitude matrix ``G(x)`` from the
+    diffusion coefficients
+  - Fixed loading time series from a file, which previously raised a
+    ``TypeError``
+  - Consistent coefficient labels (``F_x1...``, ``D_x1x1...``) and
+    clearer input validation
+  - Reports the condition number of the moment matrix and offers
+    least-squares solvers
+  - Optional PyTorch backend for large datasets, and a regression test
+    suite
+
+- 0.1.x(2024-04-01)
+
+  - Initial beta release
 
 Citation
 --------
 
 If you use ``HiNTS`` in your research, please cite our work as follows:
-
-.. bibliography::
 
 .. code:: bibtex
 
@@ -128,32 +176,31 @@ If you use ``HiNTS`` in your research, please cite our work as follows:
    }
 
    @article{revealing2024,
-    title = {Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
-    author = {Tabar, M. Reza Rahimi and Nikakhtar, Farnik and Parkavousi, Laya and Akhshi, Amin and Feudel, Ulrike and Lehnertz, Klaus},
-    journal = {Phys. Rev. X},
-    volume = {14},
-    issue = {1},
-    pages = {011050},
-    numpages = {36},
-    year = {2024},
-    month = {Mar},
-    publisher = {American Physical Society},
-    doi = {10.1103/PhysRevX.14.011050},
-    url = {https://link.aps.org/doi/10.1103/PhysRevX.14.011050}
+     title = {Revealing Higher-Order Interactions in High-Dimensional Complex Systems: A Data-Driven Approach},
+     author = {Tabar, M. Reza Rahimi and Nikakhtar, Farnik and Parkavousi, Laya and Akhshi, Amin and Feudel, Ulrike and Lehnertz, Klaus},
+     journal = {Phys. Rev. X},
+     volume = {14},
+     issue = {1},
+     pages = {011050},
+     numpages = {36},
+     year = {2024},
+     month = {Mar},
+     publisher = {American Physical Society},
+     doi = {10.1103/PhysRevX.14.011050},
+     url = {https://link.aps.org/doi/10.1103/PhysRevX.14.011050}
    }
 
    @article{reconstruction2023,
-    title = {Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
-    author = {Nikakhtar, Farnik and Parkavousi, Laya and Sahimi, Muhammad and Tabar, M Reza Rahimi and Feudel, Ulrike and Lehnertz, Klaus},
-    journal = {New Journal of Physics},
-    volume = {25},
-    number = {8},
-    pages = {083025},
-    year = {2023},
-    publisher = {IOP Publishing},
-    doi = {10.1088/1367-2630/acec63},
+     title = {Data-driven reconstruction of stochastic dynamical equations based on statistical moments},
+     author = {Nikakhtar, Farnik and Parkavousi, Laya and Sahimi, Muhammad and Tabar, M Reza Rahimi and Feudel, Ulrike and Lehnertz, Klaus},
+     journal = {New Journal of Physics},
+     volume = {25},
+     number = {8},
+     pages = {083025},
+     year = {2023},
+     publisher = {IOP Publishing},
+     doi = {10.1088/1367-2630/acec63},
    }
-
 
 Contact
 -------

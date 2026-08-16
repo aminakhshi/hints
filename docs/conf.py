@@ -2,16 +2,25 @@
 #
 
 import os
+import re
 import sys
 
-sys.path.insert(0, os.path.abspath('../hints'))
-sys.path.insert(0, os.path.abspath('../examples'))
-# -- Project information -----------------------------------------------------
-# from hints import __version__
+# Put the repository root on the path so that ``import hints`` resolves to the
+# package rather than to hints/hints.py.
+sys.path.insert(0, os.path.abspath('..'))
 
-# Get the version and release
-version = '0.1.1'
-release = '0.1'
+# -- Project information -----------------------------------------------------
+
+def _get_version():
+    """Reads the version from the package without importing its dependencies."""
+    init_file = os.path.join(os.path.dirname(__file__), '..', 'hints', '__init__.py')
+    with open(init_file, 'r') as handle:
+        match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", handle.read(), re.M)
+    return match.group(1) if match else '0.0.0'
+
+
+release = _get_version()
+version = '.'.join(release.split('.')[:2])
 project = 'HiNTS'
 copyright = '2024, Amin Akhshi'
 author = 'Amin Akhshi'
@@ -46,7 +55,12 @@ bibtex_bibfiles = ['refs.bib']
 
 
 
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'requirements.txt']
+# 'build' is the local output directory of docs/Makefile. Without it here,
+# Sphinx picks up its own previous output as source files.
+exclude_patterns = ['_build', 'build', 'Thumbs.db', '.DS_Store', 'requirements.txt']
+
+# The optional GPU backend must not be required to build the documentation.
+autodoc_mock_imports = ['torch']
 
 
 
